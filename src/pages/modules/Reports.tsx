@@ -369,9 +369,6 @@ export default function Reports() {
   const isCEO = session?.role === "CEO";
   const myEmployeeId = session?.role === "EMPLOYEE" ? (session.employeeId ?? "") : "";
 
-  // ✅ Always a string (never undefined)
-  const defaultEmployeeId = employees[0]?.id ?? "";
-
   const [f, setF] = React.useState<Filters>(() => ({
     employeeId: isCEO ? "" : myEmployeeId,
     project: "",
@@ -383,20 +380,14 @@ export default function Reports() {
     quick: "CUSTOM",
   }));
 
-  // Keep employeeId consistent when session changes (employee mode)
   React.useEffect(() => {
     if (!isCEO) {
       setF(p => ({ ...p, employeeId: myEmployeeId }));
+    } else {
+      // CEO must always have a string here
+      setF(p => ({ ...p, employeeId: p.employeeId || "" }));
     }
   }, [isCEO, myEmployeeId]);
-
-  // Optional nicety: If CEO has no employee selected but wants one default selected
-  // (You can remove this if you prefer CEO default to "All")
-  React.useEffect(() => {
-    if (isCEO) {
-      setF(p => ({ ...p, employeeId: p.employeeId ?? "" })); // keep safe string
-    }
-  }, [isCEO]);
 
   const set = (k: keyof Filters, v: any) => setF(p => ({ ...p, [k]: v }));
 
@@ -469,66 +460,12 @@ export default function Reports() {
     downloadText("phase_engineering_tasks.csv", csv, "text/csv;charset=utf-8");
   };
 
-  // Note: this is a "filtered export", not full backup
   const exportJSON = () => {
     downloadJSON("phase_engineering_filtered_export.json", {
       schemaVersion: 2,
       updatedAt: new Date().toISOString(),
       assignments: rows
     });
-  };
-
-  const printReport = () => {
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    win.document.write(`
-      <html>
-        <head>
-          <title>Phase Engineering — Report</title>
-          <style>
-            body{font-family:Arial, sans-serif; padding:24px;}
-            h1{font-size:18px;margin:0 0 8px;}
-            .muted{color:#555;margin:0 0 16px;}
-            table{border-collapse:collapse;width:100%;}
-            th,td{border:1px solid #ccc;padding:6px;font-size:12px;vertical-align:top;}
-            th{background:#f3f5f9;text-align:left;}
-          </style>
-        </head>
-        <body>
-          <h1>Phase Engineering — Task Report</h1>
-          <p class="muted">Generated: ${new Date().toLocaleString()} • Rows: ${rows.length}</p>
-          <p class="muted">Totals: Total ${totals.total}, Completed ${totals.completed}, Pending ${totals.pending}, Overdue ${totals.overdue}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>S.N.</th><th>Date Assigned</th><th>Employee</th><th>Project</th><th>Task Type</th>
-                <th>Task Details</th><th>Deadline</th><th>Priority</th><th>Status</th><th>Remarks</th><th>CEO Comment</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map(a => `
-                <tr>
-                  <td>${a.sn}</td>
-                  <td>${a.dateAssigned}</td>
-                  <td>${a.employeeName} (${a.employeeHumanId})</td>
-                  <td>${a.project}</td>
-                  <td>${a.taskType}</td>
-                  <td>${(a.taskDetails ?? "").replaceAll("<","&lt;")}</td>
-                  <td>${a.deadline}</td>
-                  <td>${a.priority}</td>
-                  <td>${a.workStatus}</td>
-                  <td>${(a.employeeRemarks ?? "").replaceAll("<","&lt;")}</td>
-                  <td>${(a.ceoComment ?? "").replaceAll("<","&lt;")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-          <script>window.print();</script>
-        </body>
-      </html>
-    `);
-    win.document.close();
   };
 
   return (
@@ -545,13 +482,7 @@ export default function Reports() {
           <Grid container spacing={2} alignItems="center">
             {isCEO && (
               <Grid item xs={12} md={3}>
-                <TextField
-                  select
-                  label="Employee"
-                  value={f.employeeId}
-                  onChange={(e) => set("employeeId", e.target.value)}
-                  fullWidth
-                >
+                <TextField select label="Employee" value={f.employeeId} onChange={(e) => set("employeeId", e.target.value)} fullWidth>
                   <MenuItem value="">All</MenuItem>
                   {employees.map(e => (
                     <MenuItem key={e.id} value={e.id}>
@@ -610,7 +541,6 @@ export default function Reports() {
               <Stack direction={{ xs: "column", md: "row" }} spacing={1} justifyContent="flex-end">
                 <Button variant="outlined" onClick={exportCSV}>Export CSV</Button>
                 <Button variant="outlined" onClick={exportJSON}>Export JSON (filtered)</Button>
-                <Button variant="contained" onClick={printReport}>Print</Button>
               </Stack>
             </Grid>
           </Grid>
@@ -673,3 +603,4 @@ export default function Reports() {
     </Stack>
   );
 }
+
